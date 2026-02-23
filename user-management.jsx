@@ -1,0 +1,586 @@
+import { useState } from "react";
+
+// ─── Design tokens (extracted from screenshot) ────────────────────────────────
+const C = {
+  // Sidebar
+  sidebar:        "#13181f",   // very dark navy/black
+  sidebarBorder:  "#1e242d",
+  sidebarIcon:    "#4a5568",   // muted grey icons
+  sidebarActive:  "#22c55e",   // green active icon bg
+  sidebarActiveBg:"#166534",   // dark green pill bg
+  // App
+  primary:        "#22c55e",   // green (not sky-blue — matches screenshot)
+  primaryLight:   "#dcfce7",
+  primaryDark:    "#16a34a",
+  bg:             "#f8fafc",
+  surface:        "#ffffff",
+  border:         "#e2e8f0",
+  text:           "#0f172a",
+  textMuted:      "#64748b",
+  danger:         "#ef4444",
+  dangerLight:    "#fef2f2",
+  successLight:   "#f0fdf4",
+  warning:        "#f59e0b",
+  warningLight:   "#fffbeb",
+  inactive:       "#94a3b8",
+};
+
+const ROLES = ["System Admin","Doctor","Nurse","Billing Officer","Receptionist","Medical Records Officer"];
+const DEPARTMENTS = ["General Practice","Emergency","Paediatrics","Gynaecology","Surgery","Internal Medicine","Laboratory","Radiology","Pharmacy","Administration"];
+const AVATAR_COLORS = ["#22c55e","#8b5cf6","#ec4899","#3b82f6","#f59e0b","#ef4444","#06b6d4"];
+
+const ROLE_COLORS = {
+  "System Admin":            { bg:"#ede9fe", text:"#7c3aed" },
+  "Doctor":                  { bg:"#dbeafe", text:"#1d4ed8" },
+  "Nurse":                   { bg:"#dcfce7", text:"#166534" },
+  "Billing Officer":         { bg:"#fef3c7", text:"#92400e" },
+  "Receptionist":            { bg:"#fce7f3", text:"#9d174d" },
+  "Medical Records Officer": { bg:"#e0f2fe", text:"#0369a1" },
+};
+
+const SAMPLE_USERS = [
+  { id:1, firstName:"Adebayo",  lastName:"Ogundimu",  email:"a.ogundimu@6030health.ng",  phone:"08012345678", role:"Doctor",                 departments:["General Practice","Emergency"],  status:"Active",   lastLogin:"2026-02-21 08:34", avatar:"AO" },
+  { id:2, firstName:"Chioma",   lastName:"Nwachukwu", email:"c.nwachukwu@6030health.ng", phone:"09023456789", role:"Nurse",                  departments:["Paediatrics"],                   status:"Active",   lastLogin:"2026-02-21 07:12", avatar:"CN" },
+  { id:3, firstName:"Emeka",    lastName:"Okafor",    email:"e.okafor@6030health.ng",    phone:"08134567890", role:"System Admin",            departments:["Administration"],                status:"Active",   lastLogin:"2026-02-20 17:45", avatar:"EO" },
+  { id:4, firstName:"Fatima",   lastName:"Bello",     email:"f.bello@6030health.ng",     phone:"07045678901", role:"Receptionist",            departments:["Administration"],                status:"Active",   lastLogin:"2026-02-21 09:01", avatar:"FB" },
+  { id:5, firstName:"Gbenga",   lastName:"Adeleke",   email:"g.adeleke@6030health.ng",   phone:"08056789012", role:"Billing Officer",         departments:["Administration"],                status:"Inactive", lastLogin:"2026-01-15 11:22", avatar:"GA" },
+  { id:6, firstName:"Halima",   lastName:"Ibrahim",   email:"h.ibrahim@6030health.ng",   phone:"09067890123", role:"Medical Records Officer", departments:["Administration"],                status:"Active",   lastLogin:"2026-02-21 08:50", avatar:"HI" },
+  { id:7, firstName:"Ikenna",   lastName:"Obi",       email:"i.obi@6030health.ng",       phone:"08078901234", role:"Doctor",                 departments:["Surgery","Internal Medicine"],    status:"Active",   lastLogin:"2026-02-20 14:30", avatar:"IO" },
+];
+
+// ─── SVG icon paths ───────────────────────────────────────────────────────────
+const SVG = {
+  // Sidebar icons (match screenshot icons top→bottom)
+  logo:     <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
+  patients: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+  queue:    <><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="12" height="4" rx="1"/></>,
+  clinical: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>,
+  billing:  <><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></>,
+  reports:  <><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
+  settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
+  // UI icons
+  search:   <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+  bell:     <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>,
+  plus:     <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+  edit:     <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
+  key:      <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>,
+  ban:      <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></>,
+  refresh:  <><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.85"/></>,
+  check:    <><polyline points="20 6 9 17 4 12"/></>,
+  x:        <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+  eye:      <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
+  eyeOff:   <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></>,
+  copy:     <><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>,
+  chevron:  <><polyline points="6 9 12 15 18 9"/></>,
+  warn:     <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
+  users:    <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+  shield:   <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
+};
+
+const Ic = ({ n, s = 16, color = "currentColor" }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0, display:"block" }}>
+    {SVG[n]}
+  </svg>
+);
+
+// ─── Components ───────────────────────────────────────────────────────────────
+const Av = ({ initials, size = 32, bg = C.primary }) => (
+  <div style={{
+    width:size, height:size, borderRadius:"50%", flexShrink:0,
+    background:`linear-gradient(135deg, ${bg}, ${bg}cc)`,
+    display:"flex", alignItems:"center", justifyContent:"center",
+    color:"#fff", fontWeight:700, fontSize:size*0.34, letterSpacing:"0.03em",
+  }}>{initials}</div>
+);
+
+const RoleBadge = ({ role }) => {
+  const col = ROLE_COLORS[role] || { bg:"#f1f5f9", text:"#64748b" };
+  return <span style={{ background:col.bg, color:col.text, padding:"2px 10px", borderRadius:20, fontSize:11, fontWeight:600, whiteSpace:"nowrap" }}>{role}</span>;
+};
+
+const StatusDot = ({ status }) => (
+  <span style={{
+    display:"inline-flex", alignItems:"center", gap:5,
+    background:status==="Active" ? C.successLight : "#f1f5f9",
+    color:status==="Active" ? "#16a34a" : C.inactive,
+    padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:600,
+  }}>
+    <span style={{ width:6, height:6, borderRadius:"50%", background:status==="Active"?"#16a34a":C.inactive, flexShrink:0 }}/>
+    {status}
+  </span>
+);
+
+const ib = (err) => ({
+  width:"100%", padding:"9px 12px", borderRadius:8, fontSize:13, fontFamily:"inherit",
+  border:`1.5px solid ${err ? C.danger : C.border}`,
+  background:"#fff", color:C.text, outline:"none", boxSizing:"border-box",
+});
+
+const Inp = ({ label, required, type="text", value, onChange, placeholder, error, hint }) => (
+  <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+    {label && <label style={{ fontSize:12, fontWeight:600, color:C.text, letterSpacing:"0.04em" }}>
+      {label}{required && <span style={{ color:C.danger }}> *</span>}
+    </label>}
+    <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={ib(error)} />
+    {error && <span style={{ fontSize:11, color:C.danger }}>{error}</span>}
+    {hint && !error && <span style={{ fontSize:11, color:C.textMuted }}>{hint}</span>}
+  </div>
+);
+
+const Sel = ({ label, required, value, onChange, options, error, placeholder="Select…" }) => (
+  <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+    {label && <label style={{ fontSize:12, fontWeight:600, color:C.text, letterSpacing:"0.04em" }}>
+      {label}{required && <span style={{ color:C.danger }}> *</span>}
+    </label>}
+    <div style={{ position:"relative" }}>
+      <select value={value} onChange={e=>onChange(e.target.value)} style={{ ...ib(error), appearance:"none", paddingRight:32, cursor:"pointer", color:value?C.text:C.textMuted }}>
+        <option value="">{placeholder}</option>
+        {options.map(o=><option key={o} value={o}>{o}</option>)}
+      </select>
+      <span style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", pointerEvents:"none", color:C.textMuted, display:"flex" }}>
+        <Ic n="chevron" s={14}/>
+      </span>
+    </div>
+    {error && <span style={{ fontSize:11, color:C.danger }}>{error}</span>}
+  </div>
+);
+
+const MultiCheck = ({ label, required, options, selected, onChange, error }) => (
+  <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+    {label && <label style={{ fontSize:12, fontWeight:600, color:C.text, letterSpacing:"0.04em" }}>
+      {label}{required && <span style={{ color:C.danger }}> *</span>}
+    </label>}
+    <div style={{ border:`1.5px solid ${error?C.danger:C.border}`, borderRadius:8, padding:"8px 12px", background:"#fff", display:"grid", gridTemplateColumns:"1fr 1fr", gap:"2px 8px", maxHeight:150, overflowY:"auto" }}>
+      {options.map(opt=>(
+        <label key={opt} style={{ display:"flex", alignItems:"center", gap:7, padding:"4px 0", cursor:"pointer", fontSize:13 }}>
+          <input type="checkbox" checked={selected.includes(opt)} onChange={()=>onChange(selected.includes(opt)?selected.filter(s=>s!==opt):[...selected,opt])} style={{ accentColor:C.primary, width:13, height:13 }}/>
+          <span style={{ color:C.text }}>{opt}</span>
+        </label>
+      ))}
+    </div>
+    {error && <span style={{ fontSize:11, color:C.danger }}>{error}</span>}
+  </div>
+);
+
+const Modal = ({ title, subtitle, onClose, children, width=520 }) => (
+  <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, backdropFilter:"blur(3px)", padding:20 }}>
+    <div style={{ background:"#fff", borderRadius:14, width:"100%", maxWidth:width, boxShadow:"0 24px 64px rgba(0,0,0,0.2)", maxHeight:"90vh", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+      <div style={{ padding:"18px 22px 14px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12 }}>
+        <div>
+          <div style={{ fontSize:15, fontWeight:700, color:C.text }}>{title}</div>
+          {subtitle && <div style={{ fontSize:12, color:C.textMuted, marginTop:2 }}>{subtitle}</div>}
+        </div>
+        <button onClick={onClose} style={{ background:"#f1f5f9", border:"none", borderRadius:6, cursor:"pointer", padding:6, color:C.textMuted, display:"flex" }}>
+          <Ic n="x" s={14}/>
+        </button>
+      </div>
+      <div style={{ padding:"18px 22px", overflowY:"auto", flex:1 }}>{children}</div>
+    </div>
+  </div>
+);
+
+const Toast = ({ t }) => !t ? null : (
+  <div style={{ position:"fixed", top:20, right:20, zIndex:2000, background:t.type==="danger"?C.danger:"#0f172a", color:"#fff", borderRadius:10, padding:"11px 16px", boxShadow:"0 8px 30px rgba(0,0,0,0.2)", fontSize:13, fontWeight:500, display:"flex", alignItems:"center", gap:9, maxWidth:360, animation:"fadeSlide 0.2s ease" }}>
+    <span style={{ color:t.type==="danger"?"#fff":"#4ade80", display:"flex" }}><Ic n={t.type==="danger"?"ban":"check"} s={15}/></span>
+    {t.msg}
+  </div>
+);
+
+// ═════════════════════════════════════════════════════════════════════════════
+export default function App() {
+  const [users, setUsers]             = useState(SAMPLE_USERS);
+  const [search, setSearch]           = useState("");
+  const [roleFilter, setRoleFilter]   = useState("");
+  const [modal, setModal]             = useState(null);
+  const [target, setTarget]           = useState(null);
+  const [toast, setToast]             = useState(null);
+  const [showPw, setShowPw]           = useState(false);
+  const [copied, setCopied]           = useState(false);
+  const [generatedPw, setGeneratedPw] = useState("");
+  const [form, setForm]               = useState({});
+  const [errs, setErrs]               = useState({});
+
+  const fire = (msg, type="ok") => { setToast({msg,type}); setTimeout(()=>setToast(null),3500); };
+  const genPw = () => { const p="abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%"; return Array.from({length:12},()=>p[Math.floor(Math.random()*p.length)]).join(""); };
+  const setF  = (k,v) => { setForm(f=>({...f,[k]:v})); setErrs(e=>({...e,[k]:undefined})); };
+
+  const validate = () => {
+    const e={};
+    if (!form.firstName?.trim()||form.firstName.trim().length<2) e.firstName="Min 2 characters";
+    if (!form.lastName?.trim() ||form.lastName.trim().length<2)  e.lastName ="Min 2 characters";
+    if (!form.email?.trim())    e.email="Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email="Invalid email format";
+    else { const d=users.find(u=>u.email.toLowerCase()===form.email.toLowerCase()&&u.id!==target?.id); if(d) e.email=`Already in use: ${d.firstName} ${d.lastName} (${d.role})`; }
+    if (!form.phone?.trim()) e.phone="Phone is required";
+    else if (!/^0[7-9][0-1]\d{8}$/.test(form.phone)) e.phone="Invalid format — e.g. 08012345678";
+    if (!form.role)               e.role="Role is required";
+    if (!form.departments?.length) e.departments="Select at least one department";
+    return e;
+  };
+
+  const openCreate = () => { const pw=genPw(); setForm({firstName:"",lastName:"",email:"",phone:"",role:"",departments:[],tempPw:pw}); setErrs({}); setShowPw(false); setModal("create"); };
+  const openEdit   = (u) => { setTarget(u); setForm({firstName:u.firstName,lastName:u.lastName,email:u.email,phone:u.phone,role:u.role,departments:[...u.departments]}); setErrs({}); setModal("edit"); };
+
+  const handleCreate = () => { const e=validate(); if(Object.keys(e).length){setErrs(e);return;} const nu={id:Date.now(),status:"Active",lastLogin:"Never",avatar:`${form.firstName[0]}${form.lastName[0]}`,firstName:form.firstName.trim(),lastName:form.lastName.trim(),email:form.email.trim(),phone:form.phone.trim(),role:form.role,departments:form.departments}; setUsers(p=>[nu,...p]); setGeneratedPw(form.tempPw); setModal("showPw"); fire(`User created for ${form.role==="Doctor"?"Dr. ":""}${nu.firstName} ${nu.lastName}.`); };
+  const handleEdit   = () => { const e=validate(); if(Object.keys(e).length){setErrs(e);return;} setUsers(p=>p.map(u=>u.id===target.id?{...u,firstName:form.firstName.trim(),lastName:form.lastName.trim(),email:form.email.trim(),phone:form.phone.trim(),role:form.role,departments:form.departments}:u)); setModal(null); fire(`${form.firstName} ${form.lastName}'s profile updated.`); };
+  const handleDeactivate  = () => { setUsers(p=>p.map(u=>u.id===target.id?{...u,status:"Inactive"}:u)); setModal(null); fire(`${target.firstName} ${target.lastName} deactivated.`,"danger"); };
+  const handleReactivate  = (u) => { setUsers(p=>p.map(x=>x.id===u.id?{...x,status:"Active"}:x)); fire(`${u.firstName} ${u.lastName} reactivated.`); };
+  const handleResetPw     = () => { const pw=genPw(); setGeneratedPw(pw); setModal("showPw"); fire(`Password reset for ${target.firstName} ${target.lastName}.`); };
+  const copyPw            = (txt) => { navigator.clipboard.writeText(txt).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),2000); };
+
+  const filtered = users.filter(u=>{const q=search.toLowerCase(); return (!q||`${u.firstName} ${u.lastName} ${u.email} ${u.role}`.toLowerCase().includes(q))&&(!roleFilter||u.role===roleFilter);});
+  const activeCount=users.filter(u=>u.status==="Active").length;
+  const inactiveCount=users.filter(u=>u.status==="Inactive").length;
+
+  const btnPrimary    = { border:"none", background:C.primary, color:"#fff", borderRadius:8, padding:"10px 0", fontSize:13, fontWeight:600, cursor:"pointer" };
+  const btnSecondary  = { border:`1.5px solid ${C.border}`, background:"#fff", color:C.textMuted, borderRadius:8, padding:"10px 0", fontSize:13, fontWeight:600, cursor:"pointer" };
+  const btnDanger     = { border:"none", background:C.danger, color:"#fff", borderRadius:8, padding:"10px 0", fontSize:13, fontWeight:600, cursor:"pointer" };
+
+  // Sidebar nav items — icon key + tooltip label + active flag
+  const NAV_TOP = [
+    { icon:"patients", label:"Patients",  active:false },
+    { icon:"queue",    label:"Queue",     active:false },
+    { icon:"clinical", label:"Clinical",  active:false },
+    { icon:"billing",  label:"Billing",   active:false },
+    { icon:"reports",  label:"Reports",   active:false },
+  ];
+
+  return (
+    <div style={{ display:"flex", height:"100vh", fontFamily:"'Inter',system-ui,sans-serif", fontSize:13, color:C.text, overflow:"hidden" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        @keyframes fadeSlide{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+        input:focus,select:focus{border-color:${C.primary}!important;box-shadow:0 0 0 3px ${C.primaryLight}}
+        button:hover{opacity:.87}
+        tbody tr:hover td{background:#f8fafc!important}
+        ::-webkit-scrollbar{width:5px;height:5px}
+        ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+        [data-tip]{position:relative}
+        [data-tip]:hover::after{content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);background:#1e293b;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;white-space:nowrap;pointer-events:none;z-index:999}
+      `}</style>
+
+      {/* ══════════════════════════════════════════════════════
+          SIDEBAR — icon-only, dark, matches screenshot exactly
+          Width: ~64px  |  Background: #13181f
+          Structure (top→bottom):
+            [6H logo square]
+            ─────────────────
+            Patients icon  ← active (green bg pill)
+            Queue icon
+            Clinical icon
+            Billing icon
+            Reports icon
+            ─────────────────  (flex spacer)
+            Settings icon
+            ─────────────────
+            AO avatar
+      ══════════════════════════════════════════════════════ */}
+      <aside style={{
+        width:64, background:C.sidebar, display:"flex", flexDirection:"column",
+        alignItems:"center", padding:"12px 0", flexShrink:0, zIndex:10,
+        borderRight:`1px solid ${C.sidebarBorder}`,
+      }}>
+        {/* Logo */}
+        <div style={{
+          width:38, height:38, borderRadius:10, marginBottom:20,
+          background:`linear-gradient(135deg, ${C.primary}, #16a34a)`,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          color:"#fff", fontWeight:800, fontSize:15, letterSpacing:"-0.05em", flexShrink:0,
+        }}>6H</div>
+
+        {/* Top nav icons */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, flex:1 }}>
+          {NAV_TOP.map(item => (
+            <button key={item.icon} data-tip={item.label} style={{
+              width:42, height:42, borderRadius:10, border:"none", cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              background:"transparent", color:C.sidebarIcon, transition:"all .15s",
+            }}
+              onMouseEnter={e=>{e.currentTarget.style.background="#1e242d";e.currentTarget.style.color="#94a3b8";}}
+              onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=C.sidebarIcon;}}
+            >
+              <Ic n={item.icon} s={18}/>
+            </button>
+          ))}
+        </div>
+
+        {/* Bottom: Settings (active = green) + avatar */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+          {/* Settings — active state (this IS the current page) */}
+          <button data-tip="Settings" style={{
+            width:42, height:42, borderRadius:10, border:"none", cursor:"pointer",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            background:"rgba(34,197,94,0.15)", color:C.primary, transition:"all .15s",
+          }}>
+            <Ic n="settings" s={18} color={C.primary}/>
+          </button>
+
+          {/* Divider */}
+          <div style={{ width:32, height:1, background:C.sidebarBorder, margin:"4px 0" }}/>
+
+          {/* User avatar at bottom — "AO" as in screenshot */}
+          <div style={{
+            width:34, height:34, borderRadius:"50%",
+            background:`linear-gradient(135deg, ${C.primary}, #16a34a)`,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer",
+          }}>AO</div>
+        </div>
+      </aside>
+
+      {/* ── Main content ── */}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", background:C.bg }}>
+
+        {/* ── Top bar (matches screenshot: breadcrumb left, search + bell right) ── */}
+        <header style={{
+          height:52, background:"#fff", borderBottom:`1px solid ${C.border}`,
+          display:"flex", alignItems:"center", padding:"0 24px", gap:12, flexShrink:0,
+        }}>
+          {/* Breadcrumb */}
+          <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, flex:1 }}>
+            <span style={{ color:C.textMuted, cursor:"pointer" }}>Settings</span>
+            <span style={{ color:C.border }}>/</span>
+            <span style={{ fontWeight:600, color:C.text }}>User Management</span>
+          </div>
+
+          {/* Search — matches screenshot "Search patients… ⌘k" */}
+          <div style={{ position:"relative" }}>
+            <span style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:C.textMuted, display:"flex", pointerEvents:"none" }}>
+              <Ic n="search" s={14}/>
+            </span>
+            <input placeholder="Search patients…" style={{
+              padding:"7px 40px 7px 32px", borderRadius:8, fontSize:12, width:200,
+              border:`1.5px solid ${C.border}`, background:"#f8fafc",
+              color:C.text, outline:"none", fontFamily:"inherit",
+            }}/>
+            <span style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", color:C.inactive, fontSize:10, fontWeight:600, fontFamily:"monospace", pointerEvents:"none" }}>⌘K</span>
+          </div>
+
+          {/* Bell notification — as per screenshot */}
+          <button style={{ width:34, height:34, borderRadius:8, border:`1.5px solid ${C.border}`, background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", color:C.textMuted, cursor:"pointer", position:"relative" }}>
+            <Ic n="bell" s={16}/>
+            <span style={{ position:"absolute", top:6, right:6, width:7, height:7, borderRadius:"50%", background:C.danger, border:"2px solid #fff" }}/>
+          </button>
+        </header>
+
+        {/* ── Scrollable page body ── */}
+        <div style={{ flex:1, overflowY:"auto", padding:"24px 24px 48px" }}>
+
+          {/* Page heading */}
+          <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:20 }}>
+            <div>
+              <h1 style={{ fontSize:22, fontWeight:800, letterSpacing:"-0.03em" }}>User Management</h1>
+              <p style={{ fontSize:12, color:C.textMuted, marginTop:4 }}>Manage staff accounts, roles and access permissions</p>
+            </div>
+            <button onClick={openCreate} style={{
+              display:"flex", alignItems:"center", gap:7, border:"none",
+              background:C.primary, color:"#fff", padding:"10px 18px",
+              borderRadius:9, fontSize:13, fontWeight:600, cursor:"pointer",
+              boxShadow:"0 2px 10px rgba(34,197,94,.35)",
+            }}>
+              <Ic n="plus" s={15}/> Add User
+            </button>
+          </div>
+
+          {/* Stat cards */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:22 }}>
+            {[
+              { label:"Total Users",   value:users.length,  icon:"users",   iconBg:"#dcfce7", iconCol:C.primary },
+              { label:"Active",        value:activeCount,   icon:"check",   iconBg:"#dcfce7", iconCol:"#16a34a" },
+              { label:"Inactive",      value:inactiveCount, icon:"ban",     iconBg:"#f1f5f9", iconCol:C.inactive },
+              { label:"Roles Defined", value:ROLES.length,  icon:"shield",  iconBg:"#f3e8ff", iconCol:"#7c3aed" },
+            ].map(card=>(
+              <div key={card.label} style={{ background:"#fff", borderRadius:12, padding:"16px 18px", border:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:14 }}>
+                <div style={{ width:42, height:42, borderRadius:10, background:card.iconBg, color:card.iconCol, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <Ic n={card.icon} s={18}/>
+                </div>
+                <div>
+                  <div style={{ fontSize:26, fontWeight:800, lineHeight:1, color: card.iconCol === C.primary || card.iconCol === "#16a34a" ? C.primary : C.text }}>{card.value}</div>
+                  <div style={{ fontSize:11, color:C.textMuted, marginTop:3, fontWeight:500 }}>{card.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Table card */}
+          <div style={{ background:"#fff", borderRadius:14, border:`1px solid ${C.border}`, overflow:"hidden" }}>
+
+            {/* Toolbar */}
+            <div style={{ padding:"13px 18px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ position:"relative", flex:1, maxWidth:280 }}>
+                <span style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:C.textMuted, display:"flex", pointerEvents:"none" }}>
+                  <Ic n="search" s={13}/>
+                </span>
+                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name, email, role…" style={{ width:"100%", padding:"8px 12px 8px 30px", borderRadius:8, fontSize:12, border:`1.5px solid ${C.border}`, background:"#f8fafc", fontFamily:"inherit", color:C.text, outline:"none" }}/>
+              </div>
+              <div style={{ position:"relative" }}>
+                <select value={roleFilter} onChange={e=>setRoleFilter(e.target.value)} style={{ padding:"8px 28px 8px 12px", borderRadius:8, fontSize:12, fontFamily:"inherit", border:`1.5px solid ${C.border}`, background:"#f8fafc", color:roleFilter?C.text:C.textMuted, outline:"none", appearance:"none", cursor:"pointer" }}>
+                  <option value="">All Roles</option>
+                  {ROLES.map(r=><option key={r} value={r}>{r}</option>)}
+                </select>
+                <span style={{ position:"absolute", right:9, top:"50%", transform:"translateY(-50%)", pointerEvents:"none", color:C.textMuted, display:"flex" }}><Ic n="chevron" s={12}/></span>
+              </div>
+              <div style={{ marginLeft:"auto", fontSize:12, color:C.textMuted, fontWeight:500 }}>{filtered.length} of {users.length} users</div>
+            </div>
+
+            {/* Table */}
+            <div style={{ overflowX:"auto" }}>
+              <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                <thead>
+                  <tr style={{ background:"#f8fafc" }}>
+                    {["User","Role","Department(s)","Status","Last Login","Actions"].map(h=>(
+                      <th key={h} style={{ padding:"10px 16px", textAlign:"left", fontSize:11, fontWeight:700, color:C.textMuted, letterSpacing:"0.05em", textTransform:"uppercase", borderBottom:`1px solid ${C.border}`, whiteSpace:"nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((u,i)=>(
+                    <tr key={u.id} style={{ borderBottom:`1px solid ${C.border}` }}>
+                      <td style={{ padding:"12px 16px" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                          <Av initials={u.avatar} size={34} bg={AVATAR_COLORS[i%AVATAR_COLORS.length]}/>
+                          <div>
+                            <div style={{ fontWeight:600, fontSize:13 }}>{u.role==="Doctor"?"Dr. ":""}{u.firstName} {u.lastName}</div>
+                            <div style={{ fontSize:11, color:C.textMuted }}>{u.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding:"12px 16px" }}><RoleBadge role={u.role}/></td>
+                      <td style={{ padding:"12px 16px" }}>
+                        <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+                          {u.departments.map(d=><span key={d} style={{ background:"#f1f5f9", color:C.textMuted, padding:"2px 8px", borderRadius:20, fontSize:11, fontWeight:500 }}>{d}</span>)}
+                        </div>
+                      </td>
+                      <td style={{ padding:"12px 16px" }}><StatusDot status={u.status}/></td>
+                      <td style={{ padding:"12px 16px", fontSize:12, color:C.textMuted, whiteSpace:"nowrap" }}>{u.lastLogin}</td>
+                      <td style={{ padding:"12px 16px" }}>
+                        <div style={{ display:"flex", gap:4 }}>
+                          <button onClick={()=>openEdit(u)} title="Edit" style={{ background:"#f1f5f9", border:"none", borderRadius:6, padding:"6px 8px", color:C.textMuted, display:"flex", cursor:"pointer" }}><Ic n="edit" s={13}/></button>
+                          <button onClick={()=>{setTarget(u);setModal("resetPw");}} title="Reset password" style={{ background:"#f1f5f9", border:"none", borderRadius:6, padding:"6px 8px", color:C.textMuted, display:"flex", cursor:"pointer" }}><Ic n="key" s={13}/></button>
+                          {u.status==="Active"
+                            ? <button onClick={()=>{setTarget(u);setModal("deactivate");}} title="Deactivate" style={{ background:"#fef2f2", border:"none", borderRadius:6, padding:"6px 8px", color:C.danger, display:"flex", cursor:"pointer" }}><Ic n="ban" s={13}/></button>
+                            : <button onClick={()=>handleReactivate(u)} title="Reactivate" style={{ background:C.successLight, border:"none", borderRadius:6, padding:"6px 8px", color:"#16a34a", display:"flex", cursor:"pointer" }}><Ic n="refresh" s={13}/></button>
+                          }
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length===0 && <tr><td colSpan={6} style={{ padding:48, textAlign:"center", color:C.textMuted }}>No users found matching your search.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ════ MODALS ════ */}
+
+      {modal==="create" && (
+        <Modal title="Add New User" subtitle="Create a staff account with role and department access" onClose={()=>setModal(null)}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              <Inp label="First Name" required placeholder="Adebayo" value={form.firstName||""} onChange={v=>setF("firstName",v)} error={errs.firstName}/>
+              <Inp label="Last Name"  required placeholder="Ogundimu" value={form.lastName||""}  onChange={v=>setF("lastName",v)}  error={errs.lastName}/>
+            </div>
+            <Inp label="Email Address" required type="email" placeholder="user@hospital.ng" value={form.email||""} onChange={v=>setF("email",v)} error={errs.email}/>
+            <Inp label="Phone Number" required placeholder="08012345678" value={form.phone||""} onChange={v=>setF("phone",v)} error={errs.phone} hint="Nigerian mobile: 070 / 080 / 081 / 090 / 091 + 8 digits"/>
+            <Sel label="Role" required options={ROLES} value={form.role||""} onChange={v=>setF("role",v)} error={errs.role}/>
+            <MultiCheck label="Department(s)" required options={DEPARTMENTS} selected={form.departments||[]} onChange={v=>{setForm(f=>({...f,departments:v}));setErrs(e=>({...e,departments:undefined}));}} error={errs.departments}/>
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:C.text, letterSpacing:"0.04em" }}>Temporary Password</label>
+              <div style={{ display:"flex", gap:8 }}>
+                <div style={{ position:"relative", flex:1 }}>
+                  <input type={showPw?"text":"password"} value={form.tempPw||""} onChange={e=>setForm(f=>({...f,tempPw:e.target.value}))} style={{ ...ib(false), fontFamily:"monospace", paddingRight:38 }}/>
+                  <button onClick={()=>setShowPw(s=>!s)} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:C.textMuted, display:"flex", padding:0, cursor:"pointer" }}><Ic n={showPw?"eyeOff":"eye"} s={14}/></button>
+                </div>
+                <button onClick={()=>setForm(f=>({...f,tempPw:genPw()}))} style={{ padding:"0 13px", background:"#f1f5f9", border:`1.5px solid ${C.border}`, borderRadius:8, color:C.textMuted, fontSize:12, fontWeight:500, whiteSpace:"nowrap", cursor:"pointer" }}>↻ Regenerate</button>
+              </div>
+              <span style={{ fontSize:11, color:C.textMuted }}>Auto-generated. User must change this on first login.</span>
+            </div>
+            <div style={{ display:"flex", gap:10, paddingTop:4 }}>
+              <button onClick={()=>setModal(null)} style={{ ...btnSecondary, flex:1 }}>Cancel</button>
+              <button onClick={handleCreate}       style={{ ...btnPrimary,   flex:2 }}>Create User</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {modal==="edit" && target && (
+        <Modal title="Edit User" subtitle={`Updating account for ${target.firstName} ${target.lastName}`} onClose={()=>setModal(null)}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              <Inp label="First Name" required value={form.firstName||""} onChange={v=>setF("firstName",v)} error={errs.firstName}/>
+              <Inp label="Last Name"  required value={form.lastName||""}  onChange={v=>setF("lastName",v)}  error={errs.lastName}/>
+            </div>
+            <Inp label="Email Address" required type="email" value={form.email||""} onChange={v=>setF("email",v)} error={errs.email} hint="Email is the login identifier — changes take effect immediately."/>
+            <Inp label="Phone Number" required value={form.phone||""} onChange={v=>setF("phone",v)} error={errs.phone} hint="Nigerian mobile format"/>
+            <Sel label="Role" required options={ROLES} value={form.role||""} onChange={v=>setF("role",v)} error={errs.role}/>
+            <MultiCheck label="Department(s)" required options={DEPARTMENTS} selected={form.departments||[]} onChange={v=>{setForm(f=>({...f,departments:v}));setErrs(e=>({...e,departments:undefined}));}} error={errs.departments}/>
+            <div style={{ background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:8, padding:"10px 12px", display:"flex", gap:8, alignItems:"flex-start" }}>
+              <span style={{ color:C.warning, flexShrink:0, marginTop:1, display:"flex" }}><Ic n="warn" s={13}/></span>
+              <p style={{ fontSize:11, color:"#92400e", lineHeight:1.5 }}>Changing a user's role updates their system permissions immediately.</p>
+            </div>
+            <div style={{ display:"flex", gap:10, paddingTop:4 }}>
+              <button onClick={()=>setModal(null)} style={{ ...btnSecondary, flex:1 }}>Cancel</button>
+              <button onClick={handleEdit}         style={{ ...btnPrimary,   flex:2 }}>Save Changes</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {modal==="deactivate" && target && (
+        <Modal title="Deactivate User" onClose={()=>setModal(null)} width={420}>
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+            <div style={{ display:"flex", gap:14, alignItems:"flex-start" }}>
+              <div style={{ width:44, height:44, borderRadius:10, background:"#fef2f2", display:"flex", alignItems:"center", justifyContent:"center", color:C.danger, flexShrink:0 }}><Ic n="ban" s={20}/></div>
+              <div>
+                <p style={{ fontSize:13, lineHeight:1.6, marginBottom:8 }}>Deactivate <strong>{target.firstName} {target.lastName}</strong>? They will be <strong>immediately logged out</strong> and unable to access the system.</p>
+                <p style={{ fontSize:12, color:C.textMuted, lineHeight:1.6 }}>Their records and audit trail are preserved. This can be reversed by reactivating the account.</p>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={()=>setModal(null)} style={{ ...btnSecondary, flex:1 }}>Cancel</button>
+              <button onClick={handleDeactivate}   style={{ ...btnDanger,    flex:1 }}>Deactivate</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {modal==="resetPw" && target && (
+        <Modal title="Reset Password" subtitle={`Generate a new temporary password for ${target.firstName} ${target.lastName}`} onClose={()=>setModal(null)} width={420}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div style={{ background:C.primaryLight, borderRadius:10, padding:"14px 16px", display:"flex", gap:10 }}>
+              <span style={{ color:C.primary, flexShrink:0, marginTop:1, display:"flex" }}><Ic n="key" s={15}/></span>
+              <p style={{ fontSize:12, color:"#166534", lineHeight:1.6 }}>A new 12-character temporary password will be generated. The user will be <strong>logged out immediately</strong> and must change this on next login.<br/><strong>No email is sent</strong> — share it in person or via a secure channel.</p>
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={()=>setModal(null)} style={{ ...btnSecondary, flex:1 }}>Cancel</button>
+              <button onClick={handleResetPw}      style={{ ...btnPrimary,   flex:1 }}>Generate Password</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {modal==="showPw" && (
+        <Modal title="Temporary Password" subtitle="Share this securely — it will not be shown again." onClose={()=>setModal(null)} width={400}>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div style={{ background:"#0f172a", borderRadius:10, padding:"16px 18px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+              <code style={{ fontSize:18, fontFamily:"monospace", color:"#4ade80", letterSpacing:"0.1em", fontWeight:700 }}>{generatedPw}</code>
+              <button onClick={()=>copyPw(generatedPw)} style={{ background:copied?"#16a34a":"#1e293b", border:"none", borderRadius:7, padding:"7px 12px", color:"#fff", fontSize:12, fontWeight:600, display:"flex", alignItems:"center", gap:6, flexShrink:0, cursor:"pointer" }}>
+                <Ic n="copy" s={13}/>{copied?"Copied!":"Copy"}
+              </button>
+            </div>
+            <div style={{ background:C.warningLight, border:"1px solid #fde68a", borderRadius:8, padding:"10px 12px", display:"flex", gap:8 }}>
+              <span style={{ color:C.warning, flexShrink:0, marginTop:1, display:"flex" }}><Ic n="warn" s={13}/></span>
+              <p style={{ fontSize:11, color:"#78350f", lineHeight:1.5 }}>This password is displayed once only. The user must change it on first login. Share via a secure channel or in person.</p>
+            </div>
+            <button onClick={()=>setModal(null)} style={{ ...btnPrimary, padding:"10px 0" }}>Done</button>
+          </div>
+        </Modal>
+      )}
+
+      <Toast t={toast}/>
+    </div>
+  );
+}
